@@ -1,6 +1,13 @@
 [workspace]
 resolver = "3"
-members = []
+members = ["crates/lib/mrs-core"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["on9au <151502370+on9au@users.noreply.github.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/on9au/marie-rs"
 
 [workspace.dependencies]
 # internal
