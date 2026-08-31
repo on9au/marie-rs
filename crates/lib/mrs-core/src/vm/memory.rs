@@ -41,7 +41,7 @@ impl Sub for MemoryAddress {
 
     fn sub(self, other: Self) -> Self::Output {
         // 12 bit wrapping sub
-        Self::new((self.value().wrapping_sub(other.value())) & 0x0FFF)
+        Self::new((self.value() - other.value()) & 0x0FFF)
     }
 }
 
