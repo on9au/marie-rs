@@ -3,7 +3,7 @@
 //! Contains the main [`MarieVM`] and submodules for the ALU, control unit, I/O, memory, and
 //! registers.
 
-use crate::vm::alu::Alu;
+use crate::vm::{alu::Alu, memory::Memory};
 
 pub mod alu;
 pub mod control_unit;
@@ -14,4 +14,5 @@ pub mod registers;
 /// The MARIE Virtual Machine
 pub struct MarieVM {
     _alu: Alu,
+    _memory: Memory,
 }
