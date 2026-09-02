@@ -31,7 +31,7 @@ impl<IO> MarieVM<IO, Halted>
 where
     IO: MarieVmIODevice,
 {
-    /// Creates a new instance of the MARIE Virtual Machine with the provided I/O device and state.
+    /// Creates a new instance of the MARIE Virtual Machine with the provided I/O device.
     pub fn new(io_device: IO) -> MarieVM<IO, Halted> {
         Self {
             _core: MarieVMCore::new(io_device),
@@ -73,7 +73,7 @@ where
 
     /// Flash the VM's memory directly
     ///
-    /// WARNING: If you want to flash it with a new **PROGRAM**, use [`flash_program`] instead.
+    /// WARNING: If you want to flash it with a new **PROGRAM**, use [`Self::flash_program`] instead.
     pub fn flash_memory(&mut self, memory: [i16; MEMORY_WORD_COUNT as usize]) {
         self._core._memory.flash(memory);
     }
@@ -87,6 +87,7 @@ where
     }
 
     /// Boot the VM, transitioning it from the Halted state to the Running state.
+    #[must_use]
     pub fn boot(self) -> MarieVM<IO, Running> {
         MarieVM {
             _core: self._core,
@@ -95,6 +96,7 @@ where
     }
 
     /// Boot the VM in debug mode, transitioning it from the Halted state to the Stepping state.
+    #[must_use]
     pub fn debug(self) -> MarieVM<IO, Stepping> {
         MarieVM {
             _core: self._core,
