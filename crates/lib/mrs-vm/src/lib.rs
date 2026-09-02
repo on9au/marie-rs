@@ -1,6 +1,6 @@
 //! The MARIE Virtual Machine (VM) crate
 //!
-//! Contains the main [`MarieVM`] and modules for the ALU, control unit, I/O, memory, and
+//! Contains the main [`MarieVM`] and modules for the ALU, I/O, memory, and
 //! registers.
 
 use std::marker::PhantomData;
@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 use crate::{
     alu::Alu,
     io::MarieVmIODevice,
-    memory::{MEMORY_WORD_COUNT, Memory, MemoryAddress},
+    memory::{MEMORY_WORD_COUNT, Memory, MemoryAddress, MemoryImage},
     registers::Registers,
     states::{Halted, MarieVmState, Running, Stepping},
 };
@@ -21,16 +21,17 @@ pub mod states;
 mod value;
 
 /// The MARIE Virtual Machine.
+#[must_use]
 pub struct MarieVM<IO, S> {
-    _core: MarieVMCore<IO>,
+    core: MarieVMCore<IO>,
     _state: PhantomData<fn() -> S>,
 }
 
 // Universal methods for all states
-impl<IO: MarieVmIODevice, S: MarieVmState> MarieVM<IO, S> {
+impl<IO, S> MarieVM<IO, S> {
     fn transition<S2: MarieVmState>(self) -> MarieVM<IO, S2> {
         MarieVM {
-            _core: self._core,
+            core: self.core,
             _state: PhantomData,
         }
     }
@@ -44,7 +45,7 @@ where
     /// Creates a new instance of the MARIE Virtual Machine with the provided I/O device.
     pub fn new(io_device: IO) -> MarieVM<IO, Halted> {
         Self {
-            _core: MarieVMCore::new(io_device),
+            core: MarieVMCore::new(io_device),
             _state: PhantomData,
         }
     }
@@ -66,26 +67,22 @@ where
         entry_point: MemoryAddress,
     ) -> MarieVM<IO, Halted> {
         let mut vm = Self::new(io_device);
-        vm._core._memory.flash(program_memory);
-        vm._core._registers.pc = entry_point;
+        vm.core.memory.flash(program_memory);
+        vm.core.registers.pc = entry_point;
         vm
     }
 
     /// Flash the VM with a new program and set the entry point.
-    pub fn flash_program(
-        &mut self,
-        program_memory: &[i16; MEMORY_WORD_COUNT as usize],
-        entry_point: MemoryAddress,
-    ) {
-        self._core._memory.flash(program_memory);
-        self._core._registers.pc = entry_point;
+    pub fn flash_program(&mut self, program_memory: &MemoryImage, entry_point: MemoryAddress) {
+        self.core.memory.flash(program_memory);
+        self.core.registers.pc = entry_point;
     }
 
     /// Flash the VM's memory directly
     ///
     /// WARNING: If you want to flash it with a new **PROGRAM**, use [`Self::flash_program`] instead.
-    pub fn flash_memory(&mut self, memory: &[i16; MEMORY_WORD_COUNT as usize]) {
-        self._core._memory.flash(memory);
+    pub fn flash_memory(&mut self, memory: &MemoryImage) {
+        self.core.memory.flash(memory);
     }
 
     /// Resets the VM to its initial state, clearing memory and resetting registers.
@@ -93,17 +90,15 @@ where
     /// This is effectively the same as creating a new instance of the VM, but it retains the I/O
     /// device.
     pub fn reset(&mut self) {
-        self._core.reset();
+        self.core.reset();
     }
 
     /// Boot the VM, transitioning it from the Halted state to the Running state.
-    #[must_use]
     pub fn boot(self) -> MarieVM<IO, Running> {
         self.transition::<Running>()
     }
 
     /// Boot the VM in debug mode, transitioning it from the Halted state to the Stepping state.
-    #[must_use]
     pub fn debug(self) -> MarieVM<IO, Stepping> {
         self.transition::<Stepping>()
     }
@@ -111,30 +106,30 @@ where
 
 /// The MARIE Virtual Machine **Core**.
 struct MarieVMCore<IO> {
-    _registers: Registers,
-    _alu: Alu,
-    _memory: Memory,
-    _io_device: IO,
+    registers: Registers,
+    alu: Alu,
+    memory: Memory,
+    io_device: IO,
 }
 
 impl<IO> MarieVMCore<IO>
 where
     IO: MarieVmIODevice,
 {
-    /// Creates a new instance of the MARIE Virtual Machine with the provided I/O device.
+    /// Creates a new instance of the MARIE VM core with the provided I/O device.
     fn new(io_device: IO) -> Self {
         Self {
-            _registers: Registers::new(),
-            _alu: Alu,
-            _memory: Memory::new(),
-            _io_device: io_device,
+            registers: Registers::new(),
+            alu: Alu,
+            memory: Memory::new(),
+            io_device,
         }
     }
 
     /// Resets the VM core to its initial state, clearing memory and resetting registers.
     /// Retains the IO device.
     fn reset(&mut self) {
-        self._registers.reset();
-        self._memory.clear();
+        self.registers.reset();
+        self.memory.clear();
     }
 }

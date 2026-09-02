@@ -7,6 +7,9 @@ use crate::value::Value;
 /// Word count for MARIE VM memory
 pub const MEMORY_WORD_COUNT: u16 = 4096; // 12-bit address space
 
+/// Storage type for the MARIE VM memory image
+pub type MemoryImage = [i16; MEMORY_WORD_COUNT as usize];
+
 /// Newtype for memory addresses in the MARIE VM
 ///
 /// Enforces that memory addresses are within the valid range of the MARIE VM's memory address
@@ -56,7 +59,7 @@ impl From<Value> for MemoryAddress {
 pub struct Memory {
     /// Internal memory storage
     ///
-    internal_memory: [i16; MEMORY_WORD_COUNT as usize],
+    internal_memory: MemoryImage,
 }
 
 impl Memory {
@@ -86,7 +89,7 @@ impl Memory {
     ///
     /// Note: If you are trying to flash the VM with a program,
     /// make sure you update the PC inside the registers too.
-    pub fn flash(&mut self, memory: &[i16; MEMORY_WORD_COUNT as usize]) {
+    pub fn flash(&mut self, memory: &MemoryImage) {
         self.internal_memory = *memory;
     }
 }
