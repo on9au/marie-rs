@@ -11,5 +11,7 @@ repository = "https://github.com/on9au/marie-rs"
 
 [workspace.dependencies]
 # internal
+mrs-core = { path = "crates/lib/mrs-core" }
+mrs-vm = { path = "crates/lib/mrs-vm" }
 
 # external
