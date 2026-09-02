@@ -1,10 +1,19 @@
 //! MARIE VM states
 
-pub trait MarieVmState {}
+mod sealed {
+    pub trait Sealed {}
+}
 
-pub struct Halted;
+pub trait MarieVmState: sealed::Sealed {}
+
+pub enum Halted {}
+impl sealed::Sealed for Halted {}
 impl MarieVmState for Halted {}
-pub struct Running;
+
+pub enum Running {}
+impl sealed::Sealed for Running {}
 impl MarieVmState for Running {}
-pub struct Stepping;
+
+pub enum Stepping {}
+impl sealed::Sealed for Stepping {}
 impl MarieVmState for Stepping {}
