@@ -1,6 +1,6 @@
 //! ALU-related code
 
-use crate::vm::value::Value;
+use crate::value::Value;
 
 /// MARIE CPU ALU
 /// Houses methods for performing arithmetic and logical operations

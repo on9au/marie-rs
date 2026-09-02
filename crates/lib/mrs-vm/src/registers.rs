@@ -1,6 +1,6 @@
 //! MARIE VM registers module
 
-use crate::vm::{memory::MemoryAddress, value::Value};
+use crate::{memory::MemoryAddress, value::Value};
 
 /// Registers of the MARIE Virtual Machine (VM)
 pub struct Registers {

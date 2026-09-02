@@ -2,7 +2,7 @@
 
 use std::ops::{Add, Sub};
 
-use crate::vm::value::Value;
+use crate::value::Value;
 
 /// Word count for MARIE VM memory
 pub const MEMORY_WORD_COUNT: u16 = 4096; // 12-bit address space

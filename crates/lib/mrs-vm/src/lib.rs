@@ -1,9 +1,9 @@
-//! The MARIE Virtual Machine (VM) module
+//! The MARIE Virtual Machine (VM) crate
 //!
-//! Contains the main [`MarieVM`] and submodules for the ALU, control unit, I/O, memory, and
+//! Contains the main [`MarieVM`] and modules for the ALU, control unit, I/O, memory, and
 //! registers.
 
-use crate::vm::{alu::Alu, io::MarieVmIODevice, memory::Memory};
+use crate::{alu::Alu, io::MarieVmIODevice, memory::Memory};
 
 pub mod alu;
 pub mod control_unit;
