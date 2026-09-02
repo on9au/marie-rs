@@ -1,64 +1,38 @@
 //! Memory module
+//!
+//! The address space itself lives in [`mrs_core::address`] so that the assembler and
+//! linter can share it; this module adds the VM's mutable store and is re-exported
+//! here for convenience.
 
-use std::ops::{Add, Sub};
+use std::fmt;
 
-use crate::value::Value;
+pub use mrs_core::address::{ADDRESS_MASK, MEMORY_WORD_COUNT, MemoryAddress, MemoryImage};
 
-/// Word count for MARIE VM memory
-pub const MEMORY_WORD_COUNT: u16 = 4096; // 12-bit address space
-
-/// Storage type for the MARIE VM memory image
-pub type MemoryImage = [i16; MEMORY_WORD_COUNT as usize];
-
-/// Newtype for memory addresses in the MARIE VM
-///
-/// Enforces that memory addresses are within the valid range of the MARIE VM's memory address
-/// space.
+/// An error returned when a program is too large to fit in memory at the requested origin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MemoryAddress(u16);
+pub struct ProgramTooLarge {
+    /// The origin the program was to be loaded at.
+    pub origin: MemoryAddress,
+    /// The length of the program, in words.
+    pub length: usize,
+}
 
-impl MemoryAddress {
-    /// Creates a new `MemoryAddress` from a `usize`
-    pub fn new(address: u16) -> Self {
-        assert!(address < MEMORY_WORD_COUNT, "Address out of bounds");
-        Self(address)
-    }
-
-    /// Returns the underlying value of the memory address
-    pub fn value(&self) -> u16 {
-        self.0
+impl fmt::Display for ProgramTooLarge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "program of {} words does not fit in {MEMORY_WORD_COUNT}-word memory at origin 0x{}",
+            self.length, self.origin
+        )
     }
 }
 
-impl Add for MemoryAddress {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self::Output {
-        // 12 bit wrapping add
-        Self::new((self.value() + other.value()) & 0x0FFF)
-    }
-}
-
-impl Sub for MemoryAddress {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self::Output {
-        // 12 bit wrapping sub
-        Self::new((self.value() - other.value()) & 0x0FFF)
-    }
-}
-
-impl From<Value> for MemoryAddress {
-    fn from(value: Value) -> Self {
-        let u16_bits = value.value() as u16;
-        MemoryAddress::new(u16_bits & 0x0FFF) // Ensure it's within 12 bits
-    }
-}
+impl std::error::Error for ProgramTooLarge {}
 
 /// Memory for the MARIE Virtual Machine (VM)
+#[derive(Clone, PartialEq, Eq)]
 pub struct Memory {
     /// Internal memory storage
-    ///
     internal_memory: MemoryImage,
 }
 
@@ -72,12 +46,12 @@ impl Memory {
 
     /// Reads a value from the specified memory address
     pub fn read(&self, address: MemoryAddress) -> i16 {
-        self.internal_memory[address.value() as usize]
+        self.internal_memory[address.index()]
     }
 
     /// Writes a value to the specified memory address
     pub fn write(&mut self, address: MemoryAddress, value: i16) {
-        self.internal_memory[address.value() as usize] = value;
+        self.internal_memory[address.index()] = value;
     }
 
     /// Clears the memory by setting all values to zero
@@ -92,10 +66,76 @@ impl Memory {
     pub fn flash(&mut self, memory: &MemoryImage) {
         self.internal_memory = *memory;
     }
+
+    /// Copies `words` into memory starting at `origin`, leaving the rest of memory untouched.
+    ///
+    /// Unlike [`Memory::flash`], this does not require a full memory image.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProgramTooLarge`] if the program would run past the end of memory. Memory is
+    /// left unmodified in that case.
+    pub fn load(&mut self, origin: MemoryAddress, words: &[i16]) -> Result<(), ProgramTooLarge> {
+        let start = origin.index();
+        let end = start
+            .checked_add(words.len())
+            .filter(|end| *end <= MEMORY_WORD_COUNT as usize)
+            .ok_or(ProgramTooLarge {
+                origin,
+                length: words.len(),
+            })?;
+        self.internal_memory[start..end].copy_from_slice(words);
+        Ok(())
+    }
+
+    /// Returns the whole memory image as a slice.
+    pub fn as_slice(&self) -> &[i16] {
+        &self.internal_memory
+    }
+
+    /// Returns the whole memory image as a mutable slice.
+    pub fn as_mut_slice(&mut self) -> &mut [i16] {
+        &mut self.internal_memory
+    }
+
+    /// Returns a copy of the whole memory image.
+    pub fn snapshot(&self) -> MemoryImage {
+        self.internal_memory
+    }
 }
 
 impl Default for Memory {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// A derived `Debug` would print 4096 words; summarise instead.
+impl fmt::Debug for Memory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let used = self.internal_memory.iter().filter(|w| **w != 0).count();
+        f.debug_struct("Memory")
+            .field("words", &MEMORY_WORD_COUNT)
+            .field("non_zero_words", &used)
+            .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_copies_at_origin_and_bounds_checks() {
+        let mut memory = Memory::new();
+        memory.load(MemoryAddress::new(0x010), &[1, 2, 3]).unwrap();
+        assert_eq!(memory.read(MemoryAddress::new(0x010)), 1);
+        assert_eq!(memory.read(MemoryAddress::new(0x012)), 3);
+        assert_eq!(memory.read(MemoryAddress::new(0x013)), 0);
+
+        let err = memory.load(MemoryAddress::MAX, &[1, 2]).unwrap_err();
+        assert_eq!(err.length, 2);
+        // Memory is untouched on failure.
+        assert_eq!(memory.read(MemoryAddress::MAX), 0);
     }
 }

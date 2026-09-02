@@ -9,3 +9,6 @@ version = "0.1.0"
 [[package]]
 name = "mrs-vm"
 version = "0.1.0"
+dependencies = [
+ "mrs-core",
+]
