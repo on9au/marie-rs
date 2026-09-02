@@ -21,9 +21,19 @@ pub mod states;
 mod value;
 
 /// The MARIE Virtual Machine.
-pub struct MarieVM<IO: MarieVmIODevice, S: MarieVmState> {
+pub struct MarieVM<IO, S> {
     _core: MarieVMCore<IO>,
-    _state: PhantomData<S>,
+    _state: PhantomData<fn() -> S>,
+}
+
+// Universal methods for all states
+impl<IO: MarieVmIODevice, S: MarieVmState> MarieVM<IO, S> {
+    fn transition<S2: MarieVmState>(self) -> MarieVM<IO, S2> {
+        MarieVM {
+            _core: self._core,
+            _state: PhantomData,
+        }
+    }
 }
 
 // Methods which only apply to the MARIE VM when it is in the Halted state.
@@ -52,7 +62,7 @@ where
     /// execute invalid instructions or access memory out of bounds, leading to undefined behavior.
     pub fn new_with_program(
         io_device: IO,
-        program_memory: [i16; MEMORY_WORD_COUNT as usize],
+        program_memory: &[i16; MEMORY_WORD_COUNT as usize],
         entry_point: MemoryAddress,
     ) -> MarieVM<IO, Halted> {
         let mut vm = Self::new(io_device);
@@ -64,7 +74,7 @@ where
     /// Flash the VM with a new program and set the entry point.
     pub fn flash_program(
         &mut self,
-        program_memory: [i16; MEMORY_WORD_COUNT as usize],
+        program_memory: &[i16; MEMORY_WORD_COUNT as usize],
         entry_point: MemoryAddress,
     ) {
         self._core._memory.flash(program_memory);
@@ -74,7 +84,7 @@ where
     /// Flash the VM's memory directly
     ///
     /// WARNING: If you want to flash it with a new **PROGRAM**, use [`Self::flash_program`] instead.
-    pub fn flash_memory(&mut self, memory: [i16; MEMORY_WORD_COUNT as usize]) {
+    pub fn flash_memory(&mut self, memory: &[i16; MEMORY_WORD_COUNT as usize]) {
         self._core._memory.flash(memory);
     }
 
@@ -89,24 +99,18 @@ where
     /// Boot the VM, transitioning it from the Halted state to the Running state.
     #[must_use]
     pub fn boot(self) -> MarieVM<IO, Running> {
-        MarieVM {
-            _core: self._core,
-            _state: PhantomData,
-        }
+        self.transition::<Running>()
     }
 
     /// Boot the VM in debug mode, transitioning it from the Halted state to the Stepping state.
     #[must_use]
     pub fn debug(self) -> MarieVM<IO, Stepping> {
-        MarieVM {
-            _core: self._core,
-            _state: PhantomData,
-        }
+        self.transition::<Stepping>()
     }
 }
 
 /// The MARIE Virtual Machine **Core**.
-struct MarieVMCore<IO: MarieVmIODevice> {
+struct MarieVMCore<IO> {
     _registers: Registers,
     _alu: Alu,
     _memory: Memory,
@@ -131,7 +135,6 @@ where
     /// Retains the IO device.
     fn reset(&mut self) {
         self._registers.reset();
-        self._alu = Alu;
         self._memory.clear();
     }
 }

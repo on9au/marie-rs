@@ -86,8 +86,8 @@ impl Memory {
     ///
     /// Note: If you are trying to flash the VM with a program,
     /// make sure you update the PC inside the registers too.
-    pub fn flash(&mut self, memory: [i16; MEMORY_WORD_COUNT as usize]) {
-        self.internal_memory = memory;
+    pub fn flash(&mut self, memory: &[i16; MEMORY_WORD_COUNT as usize]) {
+        self.internal_memory = *memory;
     }
 }
 
