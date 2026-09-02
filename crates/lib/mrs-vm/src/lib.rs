@@ -10,7 +10,7 @@ use crate::{
     io::MarieVmIODevice,
     memory::{MEMORY_WORD_COUNT, Memory, MemoryAddress, MemoryImage},
     registers::Registers,
-    states::{Halted, MarieVmState, Running, Stepping},
+    states::{MarieVmState, Ready, RunOutcome, Running, StepOutcome, Stepping, Terminated},
 };
 
 pub mod alu;
@@ -37,13 +37,13 @@ impl<IO, S> MarieVM<IO, S> {
     }
 }
 
-// Methods which only apply to the MARIE VM when it is in the Halted state.
-impl<IO> MarieVM<IO, Halted>
+// Methods which only apply to the MARIE VM when it is in the Ready state.
+impl<IO> MarieVM<IO, Ready>
 where
     IO: MarieVmIODevice,
 {
     /// Creates a new instance of the MARIE Virtual Machine with the provided I/O device.
-    pub fn new(io_device: IO) -> MarieVM<IO, Halted> {
+    pub fn new(io_device: IO) -> MarieVM<IO, Ready> {
         Self {
             core: MarieVMCore::new(io_device),
             _state: PhantomData,
@@ -65,7 +65,7 @@ where
         io_device: IO,
         program_memory: &[i16; MEMORY_WORD_COUNT as usize],
         entry_point: MemoryAddress,
-    ) -> MarieVM<IO, Halted> {
+    ) -> MarieVM<IO, Ready> {
         let mut vm = Self::new(io_device);
         vm.core.memory.flash(program_memory);
         vm.core.registers.pc = entry_point;
@@ -93,14 +93,56 @@ where
         self.core.reset();
     }
 
-    /// Boot the VM, transitioning it from the Halted state to the Running state.
+    /// Boot the VM, transitioning it from the Ready state to the Running state.
     pub fn boot(self) -> MarieVM<IO, Running> {
         self.transition::<Running>()
     }
 
-    /// Boot the VM in debug mode, transitioning it from the Halted state to the Stepping state.
+    /// Boot the VM in debug mode, transitioning it from the Ready state to the Stepping state.
     pub fn debug(self) -> MarieVM<IO, Stepping> {
         self.transition::<Stepping>()
+    }
+}
+
+impl<IO: MarieVmIODevice> MarieVM<IO, Running> {
+    pub fn run(self) -> RunOutcome<IO> {
+        // impl run
+        RunOutcome::Terminated(self.transition::<Terminated>())
+    }
+
+    pub fn pause(self) -> MarieVM<IO, Stepping> {
+        self.transition::<Stepping>()
+    }
+}
+
+impl<IO: MarieVmIODevice> MarieVM<IO, Stepping> {
+    pub fn step(self) -> StepOutcome<IO> {
+        // impl step
+        StepOutcome::Stepped(self.transition::<Stepping>())
+    }
+
+    pub fn resume(self) -> MarieVM<IO, Running> {
+        self.transition::<Running>()
+    }
+}
+
+impl<IO: MarieVmIODevice> MarieVM<IO, Terminated> {
+    pub fn reset(self) -> MarieVM<IO, Ready> {
+        let mut vm = self.transition::<Ready>();
+        vm.core.reset();
+        vm
+    }
+
+    pub fn reset_with_program(
+        self,
+        program_memory: &MemoryImage,
+        entry_point: MemoryAddress,
+    ) -> MarieVM<IO, Ready> {
+        let mut vm = self.transition::<Ready>();
+        vm.core.reset();
+        vm.core.memory.flash(program_memory);
+        vm.core.registers.pc = entry_point;
+        vm
     }
 }
 
