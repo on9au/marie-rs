@@ -38,6 +38,15 @@ impl Registers {
             mbr: Value::new(0),
         }
     }
+
+    /// Resets the registers to their default values.
+    pub fn reset(&mut self) {
+        self.ac = Value::new(0);
+        self.pc = MemoryAddress::new(0);
+        self.ir = Value::new(0);
+        self.mar = MemoryAddress::new(0);
+        self.mbr = Value::new(0);
+    }
 }
 
 impl Default for Registers {
