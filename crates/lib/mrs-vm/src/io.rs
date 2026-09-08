@@ -1,45 +1,24 @@
 //! MARIE VM IO module
 
 use std::collections::VecDeque;
-use std::fmt;
 use std::task::Poll;
+
+use thiserror::Error;
 
 use mrs_core::literal::{ParseWordError, parse_prefixed_word};
 
 /// An error raised by an I/O device.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum IoError {
     /// The input stream is exhausted; no further values can be read.
+    #[error("end of input")]
     Eof,
     /// The underlying stream failed.
-    Io(std::io::Error),
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
     /// A value was read but could not be interpreted as a 16-bit word.
+    #[error("could not parse input: {0}")]
     Parse(String),
-}
-
-impl fmt::Display for IoError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            IoError::Eof => f.write_str("end of input"),
-            IoError::Io(error) => write!(f, "I/O error: {error}"),
-            IoError::Parse(message) => write!(f, "could not parse input: {message}"),
-        }
-    }
-}
-
-impl std::error::Error for IoError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            IoError::Io(error) => Some(error),
-            IoError::Eof | IoError::Parse(_) => None,
-        }
-    }
-}
-
-impl From<std::io::Error> for IoError {
-    fn from(error: std::io::Error) -> Self {
-        IoError::Io(error)
-    }
 }
 
 impl From<ParseWordError> for IoError {
@@ -83,6 +62,7 @@ pub trait MarieVmIODevice {
         let _ = value;
         false
     }
+
 }
 
 impl<D: MarieVmIODevice + ?Sized> MarieVmIODevice for &mut D {

@@ -6,6 +6,8 @@
 use std::fmt;
 use std::str::FromStr;
 
+use thiserror::Error;
+
 use crate::instruction::Opcode;
 use crate::literal::Radix;
 
@@ -129,16 +131,9 @@ impl fmt::Display for Directive {
 }
 
 /// Returned when a mnemonic names neither an opcode nor a directive.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("unknown mnemonic '{0}'")]
 pub struct UnknownMnemonic(pub String);
-
-impl fmt::Display for UnknownMnemonic {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "unknown mnemonic '{}'", self.0)
-    }
-}
-
-impl std::error::Error for UnknownMnemonic {}
 
 impl FromStr for Directive {
     type Err = UnknownMnemonic;

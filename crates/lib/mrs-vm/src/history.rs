@@ -12,6 +12,8 @@
 use std::collections::VecDeque;
 use std::fmt;
 
+use thiserror::Error;
+
 use mrs_core::{Instruction, MemoryAddress};
 
 use crate::microcode::MicroOp;
@@ -200,34 +202,21 @@ impl History {
 }
 
 /// Why the machine could not be stepped backwards.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub enum StepBackError {
     /// There is nothing recorded to undo.
     ///
     /// Either the journal is disabled, the machine has not executed anything since it
     /// was enabled, or the operation has been evicted by the journal's limit.
+    #[error("no recorded operation to undo")]
     NoHistory,
     /// The operation consumed a value the input device cannot give back.
+    #[error("the input device cannot un-read a consumed value")]
     IrreversibleInput,
     /// The operation emitted output the device cannot retract.
+    #[error("the output device cannot retract a written value")]
     IrreversibleOutput,
 }
-
-impl fmt::Display for StepBackError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            StepBackError::NoHistory => f.write_str("no recorded operation to undo"),
-            StepBackError::IrreversibleInput => {
-                f.write_str("the input device cannot un-read a consumed value")
-            }
-            StepBackError::IrreversibleOutput => {
-                f.write_str("the output device cannot retract a written value")
-            }
-        }
-    }
-}
-
-impl std::error::Error for StepBackError {}
 
 #[cfg(test)]
 mod tests {

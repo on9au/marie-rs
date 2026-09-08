@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use thiserror::Error;
+
 use mrs_core::{MemoryAddress, Opcode, Value};
 
 use crate::MarieVM;
@@ -109,11 +111,12 @@ impl fmt::Display for SuspendReason {
 }
 
 /// An unrecoverable error that stops the VM.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum Fault {
     /// The fetched word did not decode to a valid instruction.
     ///
     /// Only opcode `0xF` is unassigned.
+    #[error("invalid opcode 0x{:X} in word 0x{word:04X} at address {address}", .word.to_bits() >> 12)]
     InvalidOpcode {
         /// The address the offending word was fetched from.
         address: MemoryAddress,
@@ -121,12 +124,14 @@ pub enum Fault {
         word: Value,
     },
     /// An I/O device returned an error.
+    #[error("{opcode} at address {address} failed: {error}")]
     Io {
         /// The address of the instruction that performed the I/O.
         address: MemoryAddress,
         /// The opcode that performed the I/O: [`Opcode::Input`] or [`Opcode::Output`].
         opcode: Opcode,
         /// The underlying device error.
+        #[source]
         error: IoError,
     },
 }
@@ -136,32 +141,6 @@ impl Fault {
     pub fn address(&self) -> MemoryAddress {
         match self {
             Fault::InvalidOpcode { address, .. } | Fault::Io { address, .. } => *address,
-        }
-    }
-}
-
-impl fmt::Display for Fault {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Fault::InvalidOpcode { address, word } => write!(
-                f,
-                "invalid opcode 0x{:X} in word 0x{word:04X} at address {address}",
-                word.to_bits() >> 12,
-            ),
-            Fault::Io {
-                address,
-                opcode,
-                error,
-            } => write!(f, "{opcode} at address {address} failed: {error}"),
-        }
-    }
-}
-
-impl std::error::Error for Fault {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Fault::Io { error, .. } => Some(error),
-            Fault::InvalidOpcode { .. } => None,
         }
     }
 }

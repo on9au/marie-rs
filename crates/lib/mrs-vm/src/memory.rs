@@ -6,28 +6,21 @@
 
 use std::fmt;
 
+use thiserror::Error;
+
 pub use mrs_core::address::{ADDRESS_MASK, MEMORY_WORD_COUNT, MemoryAddress, MemoryImage};
 
 /// An error returned when a program is too large to fit in memory at the requested origin.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[error(
+    "program of {length} words does not fit in {MEMORY_WORD_COUNT}-word memory at origin 0x{origin}"
+)]
 pub struct ProgramTooLarge {
     /// The origin the program was to be loaded at.
     pub origin: MemoryAddress,
     /// The length of the program, in words.
     pub length: usize,
 }
-
-impl fmt::Display for ProgramTooLarge {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "program of {} words does not fit in {MEMORY_WORD_COUNT}-word memory at origin 0x{}",
-            self.length, self.origin
-        )
-    }
-}
-
-impl std::error::Error for ProgramTooLarge {}
 
 /// Memory for the MARIE Virtual Machine (VM)
 #[derive(Clone, PartialEq, Eq)]

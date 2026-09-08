@@ -6,6 +6,8 @@
 
 use std::fmt;
 
+use thiserror::Error;
+
 use crate::value::Value;
 
 /// The base a literal is written in.
@@ -54,42 +56,27 @@ impl fmt::Display for Radix {
 }
 
 /// Why a literal could not be turned into a 16-bit word.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ParseWordError {
     /// The literal had no digits.
+    #[error("expected a numeric literal")]
     Empty,
     /// The literal contained a character that is not a digit in its radix.
+    #[error("not a valid {radix} literal")]
     InvalidDigit {
         /// The radix the literal was read in.
         radix: Radix,
     },
     /// The literal carried a sign in a radix that does not permit one.
+    #[error("a {radix} literal cannot be signed")]
     UnexpectedSign {
         /// The radix the literal was read in.
         radix: Radix,
     },
     /// The literal does not fit in a 16-bit word.
+    #[error("literal does not fit in a 16-bit word (-32768..=65535)")]
     OutOfRange,
 }
-
-impl fmt::Display for ParseWordError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ParseWordError::Empty => f.write_str("expected a numeric literal"),
-            ParseWordError::InvalidDigit { radix } => {
-                write!(f, "not a valid {radix} literal")
-            }
-            ParseWordError::UnexpectedSign { radix } => {
-                write!(f, "a {radix} literal cannot be signed")
-            }
-            ParseWordError::OutOfRange => {
-                f.write_str("literal does not fit in a 16-bit word (-32768..=65535)")
-            }
-        }
-    }
-}
-
-impl std::error::Error for ParseWordError {}
 
 /// Parses a literal in the given radix into a machine word.
 ///
