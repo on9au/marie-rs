@@ -99,6 +99,7 @@ pub mod io;
 pub mod memory;
 pub mod microcode;
 pub mod registers;
+pub mod speed;
 pub mod states;
 
 /// The instruction encoding, re-exported from [`mrs_core`].
