@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/lib/mrs-asm", "crates/lib/mrs-core", "crates/lib/mrs-lint", "crates/lib/mrs-vm"]
+members = ["crates/lib/mrs-asm", "crates/lib/mrs-core", "crates/lib/mrs-lint", "crates/lib/mrs-lsp", "crates/lib/mrs-vm"]
 
 [workspace.package]
 version = "0.1.0"
@@ -14,8 +14,13 @@ repository = "https://github.com/on9au/marie-rs"
 mrs-asm = { path = "crates/lib/mrs-asm" }
 mrs-core = { path = "crates/lib/mrs-core" }
 mrs-lint = { path = "crates/lib/mrs-lint" }
+mrs-lsp = { path = "crates/lib/mrs-lsp" }
 mrs-vm = { path = "crates/lib/mrs-vm" }
 
 # external
 thiserror = "2.0"
 miette = "7.6"
+lsp-types = "0.97"
+lsp-server = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
