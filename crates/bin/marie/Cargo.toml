@@ -1,0 +1,17 @@
+[package]
+name = "marie"
+description = "Assemble, run, lint and debug MARIE assembly"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+mrs-asm.workspace = true
+mrs-core.workspace = true
+mrs-lint.workspace = true
+mrs-vm.workspace = true
+clap.workspace = true
+ctrlc.workspace = true
+miette = { workspace = true, features = ["fancy"] }
