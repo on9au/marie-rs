@@ -121,7 +121,7 @@ pub fn parse_word(literal: &str, radix: Radix) -> Result<Value, ParseWordError> 
 /// Returns [`ParseWordError`] on the same conditions as [`parse_word`], except that a
 /// sign is never rejected.
 pub fn parse_prefixed_word(literal: &str) -> Result<Value, ParseWordError> {
-    let (negative, body) = split_sign(literal);
+    let (negative, body) = split_prefixed_sign(literal);
 
     // `get` returns `None` rather than panicking on a non-ASCII boundary.
     let prefix = body.get(..2).map(str::to_ascii_lowercase);
@@ -135,8 +135,21 @@ pub fn parse_prefixed_word(literal: &str) -> Result<Value, ParseWordError> {
     finish(negative, digits, radix)
 }
 
-/// Splits an optional leading `+`/`-` off a literal.
+/// Splits an optional leading `-` off a literal.
+///
+/// A leading `+` is deliberately *not* stripped: MARIE.js matches decimal literals
+/// with `/^-?\d+$/`, so `+42` is a parse failure there and must be one here too.
+/// [`split_prefixed_sign`] is the lenient counterpart used for interactive input.
 fn split_sign(literal: &str) -> (bool, &str) {
+    let trimmed = literal.trim();
+    match trimmed.strip_prefix('-') {
+        Some(rest) => (true, rest.trim_start()),
+        None => (false, trimmed),
+    }
+}
+
+/// Splits an optional leading `+`/`-` off a literal, for the lenient parser.
+fn split_prefixed_sign(literal: &str) -> (bool, &str) {
     let trimmed = literal.trim();
     match trimmed.strip_prefix('-') {
         Some(rest) => (true, rest.trim_start()),
@@ -243,6 +256,19 @@ mod tests {
             })
         );
         assert_eq!(parse_word("", Radix::Decimal), Err(ParseWordError::Empty));
+    }
+
+    #[test]
+    fn a_leading_plus_is_rejected_like_marie_js() {
+        // MARIE.js parses decimal with /^-?\d+$/, so `+42` fails to parse.
+        assert_eq!(
+            parse_word("+42", Radix::Decimal),
+            Err(ParseWordError::InvalidDigit {
+                radix: Radix::Decimal
+            })
+        );
+        // The lenient interactive parser still accepts it.
+        assert_eq!(parse_prefixed_word("+42"), Ok(Value::new(42)));
     }
 
     #[test]
