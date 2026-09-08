@@ -1,0 +1,22 @@
+[package]
+name = "mrs-asm"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["pretty"]
+# Compiler-style rendering of diagnostics. Off for embedders (an LSP turns
+# diagnostics into its own protocol types and never needs a terminal renderer).
+pretty = ["dep:miette"]
+
+[dependencies]
+mrs-core.workspace = true
+thiserror.workspace = true
+miette = { workspace = true, optional = true }
+
+[dev-dependencies]
+mrs-vm.workspace = true
+miette = { workspace = true, features = ["fancy"] }

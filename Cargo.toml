@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/lib/mrs-core", "crates/lib/mrs-vm"]
+members = ["crates/lib/mrs-asm", "crates/lib/mrs-core", "crates/lib/mrs-vm"]
 
 [workspace.package]
 version = "0.1.0"
@@ -11,8 +11,10 @@ repository = "https://github.com/on9au/marie-rs"
 
 [workspace.dependencies]
 # internal
+mrs-asm = { path = "crates/lib/mrs-asm" }
 mrs-core = { path = "crates/lib/mrs-core" }
 mrs-vm = { path = "crates/lib/mrs-vm" }
 
 # external
 thiserror = "2.0"
+miette = "7.6"
