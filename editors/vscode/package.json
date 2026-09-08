@@ -1,0 +1,39 @@
+{
+  "name": "marie-lsp",
+  "displayName": "MARIE assembly",
+  "description": "Language support for MARIE assembly, backed by mrs-lsp",
+  "version": "0.1.0",
+  "publisher": "marie-rs",
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Programming Languages"],
+  "activationEvents": ["onLanguage:marie"],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "marie",
+        "aliases": ["MARIE assembly", "marie"],
+        "extensions": [".mas", ".mar"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "marie",
+        "scopeName": "source.marie",
+        "path": "./syntaxes/marie.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "MARIE assembly",
+      "properties": {
+        "marie.server.path": {
+          "type": "string",
+          "default": "marie-lsp",
+          "description": "Path to the marie-lsp executable."
+        }
+      }
+    }
+  },
+  "dependencies": { "vscode-languageclient": "^9.0.1" }
+}

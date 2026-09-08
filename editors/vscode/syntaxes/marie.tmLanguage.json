@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "MARIE assembly",
+  "scopeName": "source.marie",
+  "patterns": [
+    { "name": "comment.line.slash.marie", "match": "/.*$" },
+    { "name": "entity.name.function.marie", "match": "^\\s*[^,/\\s]+(?=\\s*,)" },
+    {
+      "name": "keyword.control.marie",
+      "match": "(?i)\\b(JnS|Load|Store|Add|Subt|Input|Output|Halt|Skipcond|Jump|LoadImmi|AddI|JumpI|LoadI|StoreI|ORG|DEC|OCT|HEX|ADR|Clear|END)\\b"
+    },
+    { "name": "constant.numeric.marie", "match": "\\b\\d[0-9a-fA-F]*\\b" }
+  ]
+}

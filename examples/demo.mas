@@ -1,0 +1,20 @@
+/ A tour of what the language server can tell you about a program.
+/ Open this file with mrs-lsp attached and try:
+/   - hover over a mnemonic, a label, or a hex operand
+/   - go to definition on `First`, then find references
+/   - rename `Total`
+/   - inlay hints show each line's address and assembled word
+/   - the two mistakes below have quick fixes
+
+        Load  First
+        Add   Second
+        Store Total
+        Skipcond C00        / quick fix: should be 0C00
+        Jump  Report
+        HALT                / lint: not the canonical spelling
+Report, Output
+        Halt
+First,  DEC 21
+Second, DEC 21
+Total,  DEC 0
+Unused, DEC 0               / lint: never referenced
