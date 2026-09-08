@@ -1,0 +1,17 @@
+/ Sum inputs until a zero is entered, then print the total.
+/
+/   $ marie run examples/sum.mas
+/   5 10 27 0  ->  42
+
+        Clear
+        Store Total
+Loop,   Input
+        Skipcond 400        / stop when the value is zero
+        Jump  Accumulate
+        Load  Total
+        Output
+        Halt
+Accumulate, Add Total
+        Store Total
+        Jump  Loop
+Total,  DEC 0

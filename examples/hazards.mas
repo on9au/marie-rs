@@ -1,0 +1,12 @@
+/ This program assembles without a single error, and is wrong in four ways.
+/ Every one of them is something the linter catches:
+/
+/   $ marie lint examples/hazards.mas
+
+        Load  First
+        Add   Second
+        Skipcond 100        / not a condition: silently tests AC < 0
+        JnS   Report        / the return slot holds an instruction
+Report, Output
+First,  DEC 21              / execution falls into the data below
+Second, DEC 21
