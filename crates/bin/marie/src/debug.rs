@@ -15,12 +15,13 @@ use mrs_asm::Assembly;
 use mrs_core::MemoryAddress;
 use mrs_vm::MarieVM;
 use mrs_vm::history::StepBackError;
-use mrs_vm::io::{IoError, MarieVmIODevice};
+use mrs_vm::io::{IoError, MarieVmIODevice, prompt_stdin};
 use mrs_vm::states::{MicroStepOutcome, StepOutcome, Stepping, Terminated};
 
 use crate::input::{self, Load};
 use crate::interrupt::Interrupt;
 use crate::name;
+use crate::stdin::InputMode;
 
 /// Arguments to `marie debug`.
 #[derive(Debug, ClapArgs)]
@@ -30,6 +31,14 @@ pub struct Args {
 
     #[command(flatten)]
     pub load: Load,
+
+    /// How `Input` reads a typed line. By default one value per line.
+    ///
+    /// `utf16` reads the line as text instead, spending one UTF-16 code unit per
+    /// `Input`, so a single typed string feeds a program that reads one character at a
+    /// time. This is the MARIE.js "Inputs" panel's Unicode (UTF-16BE) mode.
+    #[arg(long, value_enum, value_name = "MODE", default_value_t = InputMode::Word)]
+    pub input: InputMode,
 
     /// How many micro-operations to keep for stepping backwards.
     #[arg(long, default_value_t = 100_000)]
@@ -51,10 +60,26 @@ pub struct Args {
 /// keeps what it has read so the debugger can hand it over again.
 #[derive(Debug, Default)]
 struct ReplayIo {
+    /// How a typed line is decoded.
+    mode: mrs_vm::io::InputMode,
     /// Values read from the terminal and then pushed back by a rewind.
     pending: VecDeque<i16>,
+    /// Words the last typed line yielded and has not spent yet. Kept apart from
+    /// `pending` so that a rewound value is still announced as a replay while the rest
+    /// of a UTF-16 string is not.
+    typed: VecDeque<i16>,
     /// Everything written, so an output can be retracted.
     outputs: Vec<i16>,
+}
+
+impl ReplayIo {
+    /// Creates a device that reads typed lines in `mode`.
+    fn new(mode: mrs_vm::io::InputMode) -> Self {
+        Self {
+            mode,
+            ..Self::default()
+        }
+    }
 }
 
 impl MarieVmIODevice for ReplayIo {
@@ -63,26 +88,7 @@ impl MarieVmIODevice for ReplayIo {
             println!("input> {value} (replayed)");
             return Poll::Ready(Ok(value));
         }
-        let stdin = std::io::stdin();
-        loop {
-            print!("input> ");
-            let _ = std::io::stdout().flush();
-            let mut line = String::new();
-            match stdin.lock().read_line(&mut line) {
-                Err(error) => return Poll::Ready(Err(IoError::Io(error))),
-                Ok(0) => return Poll::Ready(Err(IoError::Eof)),
-                Ok(_) => {
-                    let trimmed = line.trim();
-                    if trimmed.is_empty() {
-                        continue;
-                    }
-                    match mrs_core::literal::parse_prefixed_word(trimmed) {
-                        Ok(word) => return Poll::Ready(Ok(word.value())),
-                        Err(error) => eprintln!("{error}"),
-                    }
-                }
-            }
-        }
+        Poll::Ready(prompt_stdin(self.mode, &mut self.typed))
     }
 
     fn output(&mut self, value: i16) -> Result<(), IoError> {
@@ -122,7 +128,7 @@ enum Machine {
 pub fn run(args: Args) -> miette::Result<()> {
     let program = input::load(&args.file, &args.load)?;
 
-    let mut vm = MarieVM::new(ReplayIo::default());
+    let mut vm = MarieVM::new(ReplayIo::new(args.input.into()));
     program.install(&mut vm)?;
     vm.set_history_limit(args.history);
 

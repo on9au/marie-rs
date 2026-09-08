@@ -124,41 +124,142 @@ impl<D: MarieVmIODevice + ?Sized> MarieVmIODevice for Box<D> {
     }
 }
 
+/// How a line of typed input becomes machine words.
+///
+/// MARIE.js's "Inputs" panel offers the same choice: a value at a time, or a string
+/// spent one code unit at a time. The distinction only exists because one typed line
+/// can feed more than one `Input` instruction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum InputMode {
+    /// One value per line: decimal, or `0x`, `0o` and `0b` for another base.
+    #[default]
+    Word,
+    /// A line of text, read one UTF-16 code unit per `Input`.
+    ///
+    /// MARIE.js names this mode UTF-16BE; a word holds a whole code unit, so the byte
+    /// order never actually shows. A character outside the Basic Multilingual Plane —
+    /// an emoji, say — is a surrogate pair and so spends two `Input` instructions,
+    /// which is UTF-16 working rather than a quirk: a code point does not always fit
+    /// in sixteen bits.
+    Utf16,
+}
+
+impl InputMode {
+    /// Decodes one line of input, appending the words it yields to `queue`.
+    ///
+    /// A line may yield no words at all — a blank one in [`InputMode::Word`], an empty
+    /// one in [`InputMode::Utf16`] — which is what lets a device re-prompt instead of
+    /// faulting the VM.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ParseWordError`] if [`InputMode::Word`] was given something that is
+    /// not a literal. Decoding text cannot fail.
+    pub fn decode(self, line: &str, queue: &mut VecDeque<i16>) -> Result<(), ParseWordError> {
+        match self {
+            InputMode::Word => {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    queue.push_back(parse_prefixed_word(trimmed)?.value());
+                }
+            }
+            InputMode::Utf16 => {
+                // Only the line ending is stripped. Spaces within the line are part of
+                // the string being fed — `123 + 456 =` is read a character at a time,
+                // separators included — so trimming them would change the program's
+                // input.
+                let text = line.strip_suffix('\n').unwrap_or(line);
+                let text = text.strip_suffix('\r').unwrap_or(text);
+                // A code unit is a bit pattern, so the top half of the range wraps to
+                // the negative words rather than being out of range, exactly as
+                // `HEX FFFF` assembles to `-1`.
+                queue.extend(text.encode_utf16().map(|unit| unit as i16));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Prompts on stdout and reads the next word from stdin, refilling `queue` as needed.
+///
+/// `queue` holds what an earlier line yielded and has not been read yet; a line is only
+/// asked for once it is empty, which is what makes one typed string feed many `Input`
+/// instructions in [`InputMode::Utf16`]. Blank lines and unparseable input re-prompt
+/// rather than failing, matching the MARIE.js input dialog.
+///
+/// This blocks, so it belongs to a terminal frontend; a device that must not block owns
+/// its queue and fills it from wherever its input really comes from.
+///
+/// # Errors
+///
+/// Returns [`IoError::Eof`] at end of input and [`IoError::Io`] if stdin fails.
+pub fn prompt_stdin(mode: InputMode, queue: &mut VecDeque<i16>) -> Result<i16, IoError> {
+    use std::io::{BufRead, Write};
+
+    if let Some(value) = queue.pop_front() {
+        return Ok(value);
+    }
+
+    let stdin = std::io::stdin();
+    loop {
+        print!("input> ");
+        let _ = std::io::stdout().flush();
+
+        let mut line = String::new();
+        match stdin.lock().read_line(&mut line) {
+            Err(e) => return Err(IoError::Io(e)),
+            Ok(0) => return Err(IoError::Eof),
+            Ok(_) => match mode.decode(&line, queue) {
+                Ok(()) => {
+                    if let Some(value) = queue.pop_front() {
+                        return Ok(value);
+                    }
+                }
+                Err(e) => eprintln!("{e}"),
+            },
+        }
+    }
+}
+
 /// Real device stdin/stdout
 ///
 /// Neither direction can be rewound, so a debugger stepping backwards over `Input` or
 /// `Output` on this device will report the operation as irreversible.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct StdinIo;
+#[derive(Debug, Clone, Default)]
+pub struct StdinIo {
+    /// How a typed line is decoded.
+    mode: InputMode,
+    /// Words the last line yielded that have not been read yet. Never more than one
+    /// in [`InputMode::Word`].
+    pending: VecDeque<i16>,
+}
+
+impl StdinIo {
+    /// Creates a device that reads one word per line.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Creates a device that reads lines in `mode`.
+    pub fn with_mode(mode: InputMode) -> Self {
+        Self {
+            mode,
+            pending: VecDeque::new(),
+        }
+    }
+
+    /// Returns the mode typed lines are read in.
+    pub fn mode(&self) -> InputMode {
+        self.mode
+    }
+}
 
 impl MarieVmIODevice for StdinIo {
     /// Prompts on stdout and blocks until a word is read, so this never returns
-    /// [`Poll::Pending`]. Blank lines and unparseable input re-prompt rather than
-    /// faulting the VM, matching the MARIE.js input dialog.
+    /// [`Poll::Pending`]. In [`InputMode::Utf16`] a line is only asked for once the
+    /// previous one has been spent, so one string feeds many `Input` instructions.
     fn poll_input(&mut self) -> Poll<Result<i16, IoError>> {
-        use std::io::{BufRead, Write};
-
-        let stdin = std::io::stdin();
-        loop {
-            print!("input> ");
-            let _ = std::io::stdout().flush();
-
-            let mut line = String::new();
-            match stdin.lock().read_line(&mut line) {
-                Err(e) => return Poll::Ready(Err(IoError::Io(e))),
-                Ok(0) => return Poll::Ready(Err(IoError::Eof)),
-                Ok(_) => {
-                    let trimmed = line.trim();
-                    if trimmed.is_empty() {
-                        continue;
-                    }
-                    match parse_prefixed_word(trimmed) {
-                        Ok(word) => return Poll::Ready(Ok(word.value())),
-                        Err(e) => eprintln!("{e}"),
-                    }
-                }
-            }
-        }
+        Poll::Ready(prompt_stdin(self.mode, &mut self.pending))
     }
 
     fn output(&mut self, value: i16) -> Result<(), IoError> {
@@ -312,8 +413,60 @@ mod tests {
 
     #[test]
     fn stdin_io_reports_itself_as_irreversible() {
-        let mut device = StdinIo;
+        let mut device = StdinIo::new();
         assert!(!device.unread_input(1));
         assert!(!device.unwrite_output(1));
+    }
+
+    /// Decodes `line` and returns the words it yields.
+    fn decode(mode: InputMode, line: &str) -> Result<Vec<i16>, ParseWordError> {
+        let mut queue = VecDeque::new();
+        mode.decode(line, &mut queue)?;
+        Ok(queue.into())
+    }
+
+    #[test]
+    fn a_word_line_yields_exactly_one_value() {
+        assert_eq!(decode(InputMode::Word, "17\n").unwrap(), [17]);
+        assert_eq!(decode(InputMode::Word, "  -7  \n").unwrap(), [-7]);
+        assert_eq!(decode(InputMode::Word, "0x1f\n").unwrap(), [31]);
+        // A blank line yields nothing, so the device re-prompts rather than faulting.
+        assert_eq!(decode(InputMode::Word, "   \n").unwrap(), []);
+        assert!(decode(InputMode::Word, "twelve\n").is_err());
+    }
+
+    #[test]
+    fn a_utf16_line_yields_one_word_per_code_unit() {
+        // The spaces are part of the string: an expression is read separators and all.
+        assert_eq!(
+            decode(InputMode::Utf16, "1 + 2\n").unwrap(),
+            ['1' as i16, ' ' as i16, '+' as i16, ' ' as i16, '2' as i16]
+        );
+        // Line endings are not, in either flavour.
+        assert_eq!(decode(InputMode::Utf16, "=\r\n").unwrap(), ['=' as i16]);
+        assert_eq!(decode(InputMode::Utf16, "\n").unwrap(), []);
+    }
+
+    #[test]
+    fn a_utf16_line_spends_a_surrogate_pair_on_one_character() {
+        // U+1F600 is outside the BMP, so it is two code units and two `Input`s.
+        assert_eq!(
+            decode(InputMode::Utf16, "\u{1f600}\n").unwrap(),
+            [0xD83Du16 as i16, 0xDE00u16 as i16]
+        );
+        // The top half of the range is a bit pattern, not an out-of-range value.
+        assert_eq!(decode(InputMode::Utf16, "\u{ffff}").unwrap(), [-1]);
+    }
+
+    #[test]
+    fn a_utf16_queue_is_drained_before_another_line_is_read() {
+        let mut device = StdinIo::with_mode(InputMode::Utf16);
+        assert_eq!(device.mode(), InputMode::Utf16);
+        // `prompt_stdin` only touches the terminal once the queue is empty, so a
+        // pre-filled queue exercises the draining without one.
+        device.pending.extend([b'h' as i16, b'i' as i16]);
+        assert!(matches!(device.poll_input(), Poll::Ready(Ok(0x68))));
+        assert!(matches!(device.poll_input(), Poll::Ready(Ok(0x69))));
+        assert!(device.pending.is_empty());
     }
 }

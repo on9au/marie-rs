@@ -50,11 +50,27 @@ Assemble and execute. `Input` reads stdin, `Output` writes stdout.
 | Flag | |
 |---|---|
 | `--max-steps <N>` | Stop after N instructions. **Unlimited by default** |
+| `--input <word\|utf16>` | How `Input` reads a typed line. Default: one value per line |
 | `--registers` | Print the registers when the program stops |
 | `-d, --display` | Draw the memory-mapped display as the program runs |
 | `--refresh <N>` | Instructions between display refreshes (default 3000) |
 | `-s, --speed <0-9>` | Pace execution like the MARIE.js slider |
 | `--speeds` | List the speed levels and exit |
+
+In the default `word` mode a line is one value, read in decimal unless it is
+prefixed `0x`, `0o` or `0b`. `--input utf16` reads the line as *text* instead and
+spends one UTF-16 code unit per `Input`, which is the MARIE.js "Inputs" panel's
+Unicode (UTF-16BE) mode: one typed string feeds a program that reads a character at
+a time, and a new line is only asked for once the previous one is spent.
+
+```console
+$ echo '123 + 456 =' | marie run expression.mas --input utf16
+579
+```
+
+A word holds a whole code unit, so the byte order in the name never shows. A
+character outside the Basic Multilingual Plane is a surrogate pair and therefore
+spends *two* `Input` instructions — that is UTF-16 working, not a quirk.
 
 The speed levels count **register transfers**, not instructions, so level 0
 advances the machine one micro-operation per second — slow enough to watch the
@@ -88,6 +104,7 @@ Step through a program, forwards and backwards.
 
 | Flag | |
 |---|---|
+| `--input <word\|utf16>` | How `Input` reads a typed line, as for `run` |
 | `--history <N>` | Micro-operations kept for stepping backwards (default 100000) |
 | `-b, --break <ADDR>` | Set a breakpoint before starting. Repeatable |
 | `-d, --display` | Draw the display after every command that moves the machine |

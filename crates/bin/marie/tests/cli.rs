@@ -60,6 +60,15 @@ fn marie_with_stdin(arguments: &[&str], input: &str) -> Output {
     child.wait_with_output().expect("marie should finish")
 }
 
+/// The values a program printed, with the `input>` prompts stripped out.
+fn printed(output: &Output) -> Vec<String> {
+    stdout(output)
+        .replace("input> ", " ")
+        .split_whitespace()
+        .map(str::to_owned)
+        .collect()
+}
+
 fn stdout(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
@@ -85,6 +94,17 @@ const GOOD: &str = "\
         Halt
 First,  DEC 21
 Second, DEC 21
+";
+
+/// A program that echoes the next three values read from the device.
+const ECHO3: &str = "\
+        Input
+        Output
+        Input
+        Output
+        Input
+        Output
+        Halt
 ";
 
 // ---------------------------------------------------------------------------
@@ -167,6 +187,35 @@ fn run_reads_from_stdin() {
     let path = fixture.write("echo.mas", "        Input\n        Output\n        Halt\n");
     let output = marie_with_stdin(&["run", path.to_str().unwrap()], "17\n");
     assert!(stdout(&output).contains("17"), "{}", stdout(&output));
+}
+
+#[test]
+fn run_reads_a_string_as_utf16_code_units() {
+    let fixture = Fixture::new("run-utf16");
+    let path = fixture.write("echo3.mas", ECHO3);
+    let output = marie_with_stdin(
+        &["run", path.to_str().unwrap(), "--input", "utf16"],
+        "A b\n",
+    );
+    assert!(output.status.success(), "{}", stderr(&output));
+    // One typed line feeds all three `Input` instructions, in order, the space
+    // between the letters included.
+    assert_eq!(printed(&output), ["65", "32", "98"]);
+}
+
+#[test]
+fn run_reads_one_value_per_line_by_default() {
+    let fixture = Fixture::new("run-word");
+    let path = fixture.write("echo3.mas", ECHO3);
+    // The default is unchanged, and asking for it by name is the same thing.
+    for arguments in [
+        vec!["run", path.to_str().unwrap()],
+        vec!["run", path.to_str().unwrap(), "--input", "word"],
+    ] {
+        let output = marie_with_stdin(&arguments, "17\n0x1f\n-7\n");
+        assert!(output.status.success(), "{}", stderr(&output));
+        assert_eq!(printed(&output), ["17", "31", "-7"]);
+    }
 }
 
 #[test]

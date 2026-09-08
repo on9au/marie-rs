@@ -18,6 +18,7 @@ mod input;
 mod interrupt;
 mod lint;
 mod run;
+mod stdin;
 
 use std::path::Path;
 

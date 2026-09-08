@@ -112,6 +112,20 @@ const b = Math.round(((x & 0x1f) / 31.0) * 255.0);
 `c << 3` is the usual shortcut and is wrong here: it maps full brightness to 248,
 so white comes out slightly grey and no pixel ever reaches the top of the range.
 
+## Input
+
+MARIE.js's "Inputs" panel is given a whole string and an input mode, and each
+`Input` the program executes takes the next value from it. `marie run --input`
+spells the same choice: `word` — the default — is a value per line, while `utf16`
+decodes the line to UTF-16 and hands over one code unit per `Input`, which is the
+panel's Unicode (UTF-16BE) mode. So `123 + 456 =` feeds eleven `Input`
+instructions in both.
+
+A MARIE word holds a whole code unit, so the byte order the name promises never
+actually shows. JavaScript strings are sequences of UTF-16 code units natively, so
+both implementations spend two `Input`s on a character outside the Basic
+Multilingual Plane.
+
 ## Execution speed
 
 The ten-position slider paces **micro-operations**, not instructions: MARIE.js

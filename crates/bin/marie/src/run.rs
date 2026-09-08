@@ -12,6 +12,7 @@ use mrs_vm::{MarieVM, io::StdinIo, states::RunOutcome};
 use crate::display;
 use crate::input::{self, Load};
 use crate::interrupt::{self, Interrupt};
+use crate::stdin::InputMode;
 
 /// Arguments to `marie run`.
 #[derive(Debug, ClapArgs)]
@@ -29,6 +30,14 @@ pub struct Args {
     /// Unlimited by default; a program that loops forever runs until interrupted.
     #[arg(long, value_name = "N")]
     pub max_steps: Option<u64>,
+
+    /// How `Input` reads a typed line. By default one value per line.
+    ///
+    /// `utf16` reads the line as text instead, spending one UTF-16 code unit per
+    /// `Input`, so a single typed string feeds a program that reads one character at a
+    /// time. This is the MARIE.js "Inputs" panel's Unicode (UTF-16BE) mode.
+    #[arg(long, value_enum, value_name = "MODE", default_value_t = InputMode::Word)]
+    pub input: InputMode,
 
     /// Print the registers when the program stops.
     #[arg(long)]
@@ -79,7 +88,7 @@ pub fn run(args: Args) -> miette::Result<()> {
 
     let stop = Interrupt::install();
 
-    let mut vm = MarieVM::new(StdinIo);
+    let mut vm = MarieVM::new(StdinIo::with_mode(args.input.into()));
     program.install(&mut vm)?;
 
     // A paced run drives micro-operations, which is the unit the slider counts.
