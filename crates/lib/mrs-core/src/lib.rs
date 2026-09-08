@@ -12,6 +12,7 @@
 
 pub mod address;
 pub mod directive;
+pub mod display;
 pub mod image;
 pub mod instruction;
 pub mod literal;
@@ -19,6 +20,7 @@ pub mod value;
 
 pub use address::{ADDRESS_MASK, MEMORY_WORD_COUNT, MemoryAddress, MemoryImage};
 pub use directive::Directive;
+pub use display::{DISPLAY_HEIGHT, DISPLAY_ORIGIN, DISPLAY_WIDTH, DISPLAY_WORDS, Rgb555};
 pub use image::{IMAGE_BYTES, ImageError, decode_image, decode_words, encode_image, encode_words};
 pub use instruction::{Instruction, Opcode, SkipCondition};
 pub use literal::{ParseWordError, Radix};

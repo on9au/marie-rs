@@ -79,6 +79,7 @@ use mrs_core::{Instruction, MemoryAddress, MemoryImage, Opcode, Value};
 use crate::{
     alu::Alu,
     breakpoints::BreakpointSet,
+    display::Display,
     history::{Control, Effect, Entry, History, StepBackError},
     io::MarieVmIODevice,
     memory::{Memory, ProgramTooLarge},
@@ -92,6 +93,7 @@ use crate::{
 
 pub mod alu;
 pub mod breakpoints;
+pub mod display;
 pub mod history;
 pub mod io;
 pub mod memory;
@@ -143,6 +145,15 @@ impl<IO, S> MarieVM<IO, S> {
     /// Returns the VM's memory for modification.
     pub fn memory_mut(&mut self) -> &mut Memory {
         &mut self.core.memory
+    }
+
+    /// Returns a view of the memory-mapped display.
+    ///
+    /// The display is the top of memory, so this is a borrow rather than a snapshot.
+    /// See [`MarieVmIODevice::display_write`](crate::io::MarieVmIODevice::display_write)
+    /// to be told about changes instead of polling.
+    pub fn display(&self) -> Display<'_> {
+        Display::new(&self.core.memory)
     }
 
     /// Returns the VM's I/O device.
@@ -688,7 +699,9 @@ where
             MicroOp::WriteMemory => {
                 let address = self.registers.mar;
                 let previous = self.memory.read(address);
-                self.memory.write(address, self.registers.mbr.value());
+                let value = self.registers.mbr.value();
+                self.memory.write(address, value);
+                self.notify_display(address, previous, value);
                 Effect::Memory { address, previous }
             }
             MicroOp::IncrementPc => {
@@ -763,6 +776,20 @@ where
         Ok(effect)
     }
 
+    /// Tells the device about a display pixel that changed value.
+    ///
+    /// Writes that leave a pixel unchanged are not reported: a program redrawing the
+    /// same frame should not make a frontend repaint.
+    fn notify_display(&mut self, address: MemoryAddress, previous: i16, current: i16) {
+        if previous == current {
+            return;
+        }
+        if let Some(index) = mrs_core::display::pixel_index(address) {
+            self.io_device
+                .display_write(index, mrs_core::display::Rgb555::from_bits(current as u16));
+        }
+    }
+
     /// Writes a register, returning the effect that reverses the write.
     fn write_register(&mut self, register: Register, bits: u16) -> Effect {
         let previous = self.registers.read(register);
@@ -779,7 +806,13 @@ where
         match entry.effect() {
             Effect::None => {}
             Effect::Register { register, previous } => self.registers.write(register, previous),
-            Effect::Memory { address, previous } => self.memory.write(address, previous),
+            Effect::Memory { address, previous } => {
+                let current = self.memory.read(address);
+                self.memory.write(address, previous);
+                // Rewinding changes the picture too, so a frontend drawing from the
+                // hook must hear about it or it would show a stale pixel.
+                self.notify_display(address, current, previous);
+            }
             Effect::InputRead { previous, value } => {
                 if !self.io_device.unread_input(value) {
                     return Err(StepBackError::IrreversibleInput);

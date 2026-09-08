@@ -5,6 +5,7 @@ use std::task::Poll;
 
 use thiserror::Error;
 
+use mrs_core::display::Rgb555;
 use mrs_core::literal::{ParseWordError, parse_prefixed_word};
 
 /// An error raised by an I/O device.
@@ -63,6 +64,20 @@ pub trait MarieVmIODevice {
         false
     }
 
+    /// Notifies the device that a pixel of the memory-mapped display changed.
+    ///
+    /// The display is written with ordinary `Store` instructions rather than by an I/O
+    /// instruction, so nothing would otherwise tell a frontend that the picture moved.
+    /// This hook is what lets one draw as the program runs instead of polling
+    /// [`MarieVM::display`](crate::MarieVM::display) on a timer, and it is where a web
+    /// frontend hangs its own rendering.
+    ///
+    /// `index` is row-major, `0..256`. Only called when the pixel actually changes, and
+    /// also called when [`step_back`](crate::MarieVM::step_back) restores a pixel, so a
+    /// frontend stays correct while rewinding. The default is to ignore it.
+    fn display_write(&mut self, index: usize, pixel: Rgb555) {
+        let _ = (index, pixel);
+    }
 }
 
 impl<D: MarieVmIODevice + ?Sized> MarieVmIODevice for &mut D {
@@ -81,6 +96,10 @@ impl<D: MarieVmIODevice + ?Sized> MarieVmIODevice for &mut D {
     fn unwrite_output(&mut self, value: i16) -> bool {
         (**self).unwrite_output(value)
     }
+
+    fn display_write(&mut self, index: usize, pixel: Rgb555) {
+        (**self).display_write(index, pixel);
+    }
 }
 
 impl<D: MarieVmIODevice + ?Sized> MarieVmIODevice for Box<D> {
@@ -98,6 +117,10 @@ impl<D: MarieVmIODevice + ?Sized> MarieVmIODevice for Box<D> {
 
     fn unwrite_output(&mut self, value: i16) -> bool {
         (**self).unwrite_output(value)
+    }
+
+    fn display_write(&mut self, index: usize, pixel: Rgb555) {
+        (**self).display_write(index, pixel);
     }
 }
 
