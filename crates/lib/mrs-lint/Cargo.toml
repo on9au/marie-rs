@@ -1,0 +1,19 @@
+[package]
+name = "mrs-lint"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["pretty"]
+pretty = ["mrs-asm/pretty", "dep:miette"]
+
+[dependencies]
+mrs-asm.workspace = true
+mrs-core.workspace = true
+miette = { workspace = true, optional = true }
+
+[dev-dependencies]
+mrs-vm.workspace = true
